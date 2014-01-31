@@ -18,7 +18,147 @@ formatTime = (date) ->
     mins = "0#{mins}"
   "#{hours}:#{mins}"
 
-Plot = () ->
+color = d3.scale.category10()
+
+People = () ->
+  width = 600
+  height = 400
+  people = null
+  margin = {top: 2, right: 40, bottom: 10, left: 10}
+  yScale = d3.scale.ordinal().rangeRoundBands([0,height], 0.1)
+  xScale = d3.scale.linear().range([0,width])
+
+  iso = d3.time.format.utc("%Y-%m-%dT%H:%M:%S.%LZ").parse
+
+
+  parseData = (raw) ->
+    startTimestamp = "2014-01-29T02:02:32.000Z"
+    startTime = iso(startTimestamp)
+    raw.forEach (d) ->
+      d.time = iso(d.timestamp)
+      d.type = if d.rfid_tag_id.slice(0,4) == "ABBA" then "person" else "item"
+    raw = raw.filter (d) -> d.type == "person" and d.time > startTime
+    raw = raw.filter (d) -> d.action_type == "leaderboardPush" and d.customer_name.strip != ""
+    nest = d3.nest()
+      .key((d) -> d.customer_name).sortKeys((a,b) -> d3.ascending(a.key,b.key))
+      .key((d) -> d.location)
+      .entries(raw)
+    nest.sort((a,b) -> b.values.length - a.values.length)
+    nest
+
+  countData = (raw) ->
+    counts = (num for num in [8..1])
+    dd = []
+    xScale.domain([0,raw.length])
+    dd.push {'checkins':'all people', 'count':raw.length}
+    counts.forEach (c) ->
+      all = raw.filter((n) -> n.values.length == c)
+      dd.push {'checkins':"#{c}", 'count':all.length, 'all':all}
+    yScale.domain([0,1,2,3,4,5,6,7,8])
+    dd
+      
+  chart = (selection) ->
+    selection.each (rawData) ->
+
+      data = parseData(rawData)
+      counts = countData(data)
+      console.log("people")
+      console.log(data)
+      console.log(counts)
+
+      svg = d3.select(this).selectAll("svg").data([data])
+      gEnter = svg.enter().append("svg").append("g")
+      
+      svg.attr("width", width + margin.left + margin.right )
+      svg.attr("height", height + margin.top + margin.bottom )
+
+      g = svg.select("g")
+        .attr("transform", "translate(#{margin.left},#{margin.top})")
+
+      people = g.append("g").attr("id", "vis_people")
+      people.selectAll('.bar')
+        .data(counts).enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("width", (d) -> xScale(d.count))
+        .attr("x", 0)
+        .attr("y", (d,i) -> yScale(i) )
+        .attr("height", yScale.rangeBand())
+        .attr("fill", "#ddd")
+      people.selectAll('.title')
+        .data(counts).enter()
+        .append("text")
+        .attr("y", (d,i) -> yScale(i))
+        .attr("dy", yScale.rangeBand() / 2)
+        .attr("x", 10)
+        .text((d) -> d.checkins)
+
+      people.selectAll('.count')
+        .data(counts).enter()
+        .append("text")
+        .attr("y", (d,i) -> yScale(i))
+        .attr("dy", yScale.rangeBand() / 2)
+        .attr("x", (d) -> xScale(d.count) + 10)
+        .attr("text-anchor", "start")
+        .text((d) -> d.count)
+
+      checks = d3.select("#checkins").selectAll(".check").data(counts.filter (d) -> d.checkins != "all people").enter()
+      check = checks.append("div")
+        .attr("class", "check")
+      check.append("h2")
+        .text (d) -> "#{d.checkins} badges"
+      check.append("a")
+        .attr("href", "#")
+        .attr("class", "badge_toggle").text("show")
+
+      $('.badge_toggle').on "click", (e) ->
+        section = $(this).siblings(".persons")
+        text = if section.is( ":visible" ) then "show" else "hide"
+        section.toggle()
+        $(this).text(text)
+        e.preventDefault()
+
+      cc = check.append("div")
+        .attr("class", "persons")
+
+      $('.persons').toggle()
+  
+      p = cc.selectAll(".person").data(((d) -> d.all.sort((a,b) -> a.key - b.key)), ((d) -> d.key))
+        .enter().append("div")
+        .attr("class", "person")
+      p.append("div")
+        .attr("class", "name")
+        .text((d) -> d.key.split(" ")[1] + " " + d.key.split(" ")[0])
+      badge = p.append("div")
+        .attr("class", "bb")
+
+      badge.selectAll(".badge_square")
+        .data(((d) -> d.values.sort((a,b) -> a.key - b.key)),((d) -> d.key))
+        .enter()
+        .append("div")
+        .attr("class", "badge_square")
+        .style("background-color", (d) -> color(d.key))
+        .style("opacity", 0.7)
+
+     $('.badge_square').tipsy({
+       gravity:'s'
+       html:true
+       title: () ->
+        d = this.__data__
+        "<strong>#{d.key}</strong>"
+     })
+
+      
+  chart.x = (_) ->
+    if !arguments.length
+      return xValue
+    xValue = _
+    chart
+
+  return chart
+
+
+Bubbles = () ->
   width = 1000
   height = 600
   topHeight = 300
@@ -48,7 +188,6 @@ Plot = () ->
     .scale(xScale)
     .orient("bottom")
 
-  color = d3.scale.category10()
 
   # parseTime = d3.time.format("%Y-%m-%d").parse
   iso = d3.time.format.utc("%Y-%m-%dT%H:%M:%S.%LZ").parse
@@ -67,7 +206,6 @@ Plot = () ->
     beginTime = timeExtent[0]
     endTime = timeExtent[1]
     xScale.domain(timeExtent)
-    console.log(xScale.domain())
     nest = d3.nest()
       .key((d) -> d.location)
       .key((d) -> d.binTime)
@@ -87,7 +225,6 @@ Plot = () ->
     selection.each (rawData) ->
 
       data = parseData(rawData)
-      console.log(data)
 
       svg = d3.select(this).selectAll("svg").data([data])
       gEnter = svg.enter().append("svg").append("g")
@@ -218,9 +355,7 @@ Plot = () ->
       updateMap(curTime)
       updateBubbles(curTime)
       curTime = addMinutes(curTime, timeInterval)
-      console.log(curTime)
     else
-      console.log('stop')
       chart.stop()
     
   chart.start = () ->
@@ -266,7 +401,9 @@ Plot = () ->
 
   return chart
 
-root.Plot = Plot
+root.Bubbles = Bubbles
+
+root.People = People
 
 root.plotData = (selector, data, plot) ->
   d3.select(selector)
@@ -275,13 +412,15 @@ root.plotData = (selector, data, plot) ->
 
 
 $ ->
-
-  plot = Plot()
+  bubbles = Bubbles()
+  peeps = People()
   display = (error, data) ->
-    plotData("#vis", data, plot)
+    plotData("#vis", data, bubbles)
+    plotData("#people", data, peeps)
 
-  d3.select("#play").on "click", plot.start
+  d3.select("#play").on "click", bubbles.start
   queue()
     .defer(d3.csv, "data/rfid.csv")
     .await(display)
+
 

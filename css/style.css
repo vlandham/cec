@@ -14,6 +14,42 @@
   font-weight: bold;
 }
 
+.badge_toggle {
+  float:left;
+  clear:right;
+  padding-top: 25px;
+  margin-left: 15px;
+}
+
+.check {
+  clear: both;
+}
+
+.check h2 {
+  float:left;
+}
+
+.person {
+  clear: both;
+}
+
+.person .name {
+  width: 200px;
+  height: 40px;
+  float:left;
+}
+
+.bb {
+  float: left;
+}
+
+.badge_square {
+  width: 30px;
+  height: 30px;
+  float:left;
+  margin-right: 1px;
+}
+
 #footer {
   height: 20px;
 }
