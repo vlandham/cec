@@ -262,6 +262,15 @@ Bubbles = () ->
       .attr("fill", (d) -> color(d.key))
       .attr("fill-opacity", 0.6)
       .attr("r", 20)
+      .on "mouseover", () ->
+        d3.select(this).transition()
+          .duration(100)
+          # .ease("elastic")
+          .attr("r", (d) -> mapRScale(d.total) * 1.2)
+          .transition()
+          # .ease("elastic")
+          .duration(100)
+          .attr("r", (d) -> mapRScale(d.total))
 
     map.selectAll(".title").data(data).enter().append("text")
       .attr("class", "title")
